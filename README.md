@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # media_transfer
 
 A new Flutter project.
@@ -15,3 +16,7 @@ A few resources to get you started if this is your first Flutter project:
 For help getting started with Flutter development, view the
 [online documentation](https://docs.flutter.dev/), which offers tutorials,
 samples, guidance on mobile development, and a full API reference.
+=======
+# Vconnect
+A Flutter-based cross-platform app for fast, offline file and media transfer between Android and iOS devices using local Wi-Fi, peer discovery, and TCP sockets.
+>>>>>>> 225abf17cb68c59fc919a0de20dbb87d2e6ff350
