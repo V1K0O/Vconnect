@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-
 import 'features/discovery/discovery_service.dart';
 import 'features/transfer/transfer_server.dart';
 import 'features/transfer/transfer_client.dart';
@@ -17,7 +16,6 @@ class MyApp extends StatefulWidget {
 
 class _MyAppState extends State<MyApp> {
   final DiscoveryService discoveryService = DiscoveryService();
-
   final TransferServer transferServer = TransferServer();
   final TransferClient transferClient = TransferClient();
 
@@ -25,17 +23,31 @@ class _MyAppState extends State<MyApp> {
   void initState() {
     super.initState();
 
-    // Start listening for incoming TCP connections.
     transferServer.startListening(4040);
 
-    // Advertise this device and its TCP port.
-    discoveryService.startAdvertising(4040);
+    Future.delayed(const Duration(seconds: 2), () {
+      discoveryService.startAdvertising(4040);
 
-    // Start looking for other devices.
-    discoveryService.deviceDiscovery((peer) {
-      print('Connecting to ${peer.host}:${peer.port}');
+      Future.delayed(const Duration(seconds: 1), () {
+        discoveryService.deviceDiscovery((peer) {
+          print('Peer host: ${peer.host}');
+          print('Peer port: ${peer.port}');
+          print('Peer addresses: ${peer.addresses}');
 
-      transferClient.connect(peer.host, peer.port);
+          final address = peer.addresses?.isNotEmpty == true
+              ? peer.addresses!.first.address
+              : peer.host;
+
+          if (address == null) {
+            print('No address found for peer');
+            return;
+          }
+
+          transferClient.connect(address, peer.port ?? 4040).then((_) {
+            transferClient.sendTestFile();
+          });
+        });
+      });
     });
   }
 

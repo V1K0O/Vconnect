@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'transfer_protocol.dart';
+import 'package:path_provider/path_provider.dart';
 
 class TransferClient {
   Socket? _socket;
@@ -46,6 +47,14 @@ class TransferClient {
 
     print('File sent successfully');
   }
+
+  Future<void> sendTestFile() async {
+  // Create a small test file in the documents directory
+  final directory = await getApplicationDocumentsDirectory();
+  final testFile = File('${directory.path}/test.txt');
+  await testFile.writeAsString('Hello from the other side!');
+  await sendFile(testFile.path);
+}
 
 
   
