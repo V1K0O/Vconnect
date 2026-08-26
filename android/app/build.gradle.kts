@@ -6,7 +6,7 @@ plugins {
 
 android {
     namespace = "com.vconnect.media_transfer"
-    compileSdk = flutter.compileSdkVersion
+    compileSdk = 37
     ndkVersion = "30.0.15729638"
 
     compileOptions {

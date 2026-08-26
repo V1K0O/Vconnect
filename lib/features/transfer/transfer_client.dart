@@ -1,6 +1,6 @@
 import 'dart:io';
+
 import 'transfer_protocol.dart';
-import 'package:path_provider/path_provider.dart';
 
 class TransferClient {
   Socket? _socket;
@@ -11,8 +11,13 @@ class TransferClient {
     print('Connected to server');
   }
 
-  Future<void> sendFile(String filePath) async {
-    final file = File(filePath);
+  Future<void> sendFile(
+    File file, {
+    required void Function(int sent, int total) onProgress,
+  }) async {
+    if (_socket == null) {
+      throw Exception('Not connected to server');
+    }
 
     if (!await file.exists()) {
       throw Exception('File does not exist');
@@ -27,37 +32,33 @@ class TransferClient {
       'application/octet-stream',
     );
 
-    // Send 4 bytes containing the header length first.
+    // Send 4 bytes containing the header length
     final headerLength = TransferProtocol.encodeLength(header.length);
     _socket!.add(headerLength);
 
-    // Then send the header.
+    // Send the header
     _socket!.add(header);
     await _socket!.flush();
 
     print('Sending: $fileName');
     print('Size: $fileSize bytes');
 
-    // Finally, send the actual file bytes.
+    int sentBytes = 0;
+
+    // Send actual file bytes
     await for (final chunk in file.openRead()) {
       _socket!.add(chunk);
+
+      sentBytes += chunk.length;
+
+      // Update UI progress
+      onProgress(sentBytes, fileSize);
     }
 
     await _socket!.flush();
 
     print('File sent successfully');
   }
-
-  Future<void> sendTestFile() async {
-  // Create a small test file in the documents directory
-  final directory = await getApplicationDocumentsDirectory();
-  final testFile = File('${directory.path}/test.txt');
-  await testFile.writeAsString('Hello from the other side!');
-  await sendFile(testFile.path);
-}
-
-
-  
 
   Future<void> disconnect() async {
     await _socket?.close();
