@@ -4,20 +4,33 @@ import 'transfer_protocol.dart';
 
 class TransferClient {
   Socket? _socket;
+  String? _lastHost;
+  int? _lastPort;
+
 
   Future<void> connect(String host, int port) async {
-    _socket = await Socket.connect(host, port);
+  _lastHost = host;
+  _lastPort = port;
+  _socket = await Socket.connect(host, port);
+  print('Connected to server');
+}
 
-    print('Connected to server');
+Future<void> _ensureConnected() async {
+  if (_lastHost == null || _lastPort == null) return;
+  try {
+    _socket?.destroy();
+    _socket = await Socket.connect(_lastHost!, _lastPort!);
+    print('Reconnected to server');
+  } catch (e) {
+    print('Reconnect failed: $e');
   }
+}
 
   Future<void> sendFile(
     File file, {
     required void Function(int sent, int total) onProgress,
   }) async {
-    if (_socket == null) {
-      throw Exception('Not connected to server');
-    }
+    await _ensureConnected();
 
     if (!await file.exists()) {
       throw Exception('File does not exist');

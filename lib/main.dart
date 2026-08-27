@@ -20,15 +20,25 @@ class MyApp extends StatefulWidget {
 }
 
 class _MyAppState extends State<MyApp> {
-  final DiscoveryService discoveryService = DiscoveryService();
-  final TransferServer transferServer = TransferServer();
-  final TransferClient transferClient = TransferClient();
-  final PermissionManager permissionManager = PermissionManager();
+  final DiscoveryService discoveryService =
+      DiscoveryService();
+
+  late final TransferServer transferServer;
+
+  final TransferClient transferClient =
+      TransferClient();
+
+  final PermissionManager permissionManager =
+      PermissionManager();
+
   final ImagePicker picker = ImagePicker();
 
   File? selectedFile;
 
+  List<File> receivedFiles = [];
+
   String status = 'Starting...';
+
   bool isConnected = false;
   bool isSending = false;
 
@@ -38,13 +48,50 @@ class _MyAppState extends State<MyApp> {
   void initState() {
     super.initState();
 
+    transferServer = TransferServer(
+      onFileReceived: (filePath) async {
+        print(
+          'File received by UI: $filePath',
+        );
+
+        await loadReceivedFiles();
+
+        if (!mounted) return;
+
+        setState(() {
+          status =
+              'File received successfully!';
+        });
+      },
+    );
+
     startApp();
   }
 
+
+  // LOAD RECEIVED FILES
+  Future<void> loadReceivedFiles() async {
+    final files =
+        await transferServer.getReceivedFiles();
+
+    if (!mounted) return;
+
+    setState(() {
+      receivedFiles = files;
+    });
+  }
+
+
+  // START APP
+
   Future<void> startApp() async {
-    final granted = await permissionManager.requestAllPermissions();
+    final granted =
+        await permissionManager
+            .requestAllPermissions();
 
     if (!granted) {
+      if (!mounted) return;
+
       setState(() {
         status = 'Permissions denied';
       });
@@ -52,69 +99,118 @@ class _MyAppState extends State<MyApp> {
       return;
     }
 
-    setState(() {
-      status = 'Starting transfer server...';
-    });
+    // Load previously received files.
+    await loadReceivedFiles();
 
-    transferServer.startListening(4040);
-
-    await Future.delayed(const Duration(seconds: 2));
+    if (!mounted) return;
 
     setState(() {
-      status = 'Advertising and searching for peers...';
+      status =
+          'Starting transfer server...';
     });
 
-    discoveryService.startAdvertising(4040);
+    await transferServer
+        .startListening(4040);
 
-    await Future.delayed(const Duration(seconds: 1));
+    await Future.delayed(
+      const Duration(seconds: 2),
+    );
 
-    discoveryService.deviceDiscovery((peer) async {
-      print('Peer host: ${peer.host}');
-      print('Peer port: ${peer.port}');
-      print('Peer addresses: ${peer.addresses}');
+    if (!mounted) return;
 
-      final address = peer.addresses?.isNotEmpty == true
-          ? peer.addresses!.first.address
-          : peer.host;
+    setState(() {
+      status =
+          'Advertising and searching for peers...';
+    });
 
-      if (address == null) {
-        print('No address found for peer');
+    discoveryService
+        .startAdvertising(4040);
 
-        setState(() {
-          status = 'Peer found but no address available';
-        });
+    await Future.delayed(
+      const Duration(seconds: 1),
+    );
 
-        return;
-      }
-
-      setState(() {
-        status = 'Connecting to peer...';
-      });
-
-      try {
-        await transferClient.connect(
-          address,
-          peer.port ?? 4040,
+    discoveryService.deviceDiscovery(
+      (peer) async {
+        print(
+          'Peer host: ${peer.host}',
         );
 
+        print(
+          'Peer port: ${peer.port}',
+        );
+
+        print(
+          'Peer addresses: ${peer.addresses}',
+        );
+
+        final address =
+            peer.addresses?.isNotEmpty == true
+                ? peer.addresses!.first.address
+                : peer.host;
+
+        if (address == null) {
+          print(
+            'No address found for peer',
+          );
+
+          if (!mounted) return;
+
+          setState(() {
+            status =
+                'Peer found but no address available';
+          });
+
+          return;
+        }
+
+        if (!mounted) return;
+
         setState(() {
-          isConnected = true;
-          status = 'Connected! Select a photo or video.';
+          status =
+              'Connecting to peer...';
         });
 
-        print('Connected to peer');
-      } catch (e) {
-        print('Connection error: $e');
+        try {
+          await transferClient.connect(
+            address,
+            peer.port ?? 4040,
+          );
 
-        setState(() {
-          status = 'Connection failed';
-        });
-      }
-    });
+          if (!mounted) return;
+
+          setState(() {
+            isConnected = true;
+
+            status =
+                'Connected! Select a photo or video.';
+          });
+
+          print(
+            'Connected to peer',
+          );
+        } catch (e) {
+          print(
+            'Connection error: $e',
+          );
+
+          if (!mounted) return;
+
+          setState(() {
+            status =
+                'Connection failed';
+          });
+        }
+      },
+    );
   }
 
+  // ------------------------------------------------------------
+  // PICK IMAGE
+  // ------------------------------------------------------------
   Future<void> pickImage() async {
-    final XFile? pickedFile = await picker.pickImage(
+    final XFile? pickedFile =
+        await picker.pickImage(
       source: ImageSource.gallery,
     );
 
@@ -122,14 +218,22 @@ class _MyAppState extends State<MyApp> {
       return;
     }
 
+    if (!mounted) return;
+
     setState(() {
-      selectedFile = File(pickedFile.path);
-      status = 'Photo selected: ${pickedFile.name}';
+      selectedFile =
+          File(pickedFile.path);
+
+      status =
+          'Photo selected: ${pickedFile.name}';
     });
   }
 
+
+  // PICK VIDEO
   Future<void> pickVideo() async {
-    final XFile? pickedFile = await picker.pickVideo(
+    final XFile? pickedFile =
+        await picker.pickVideo(
       source: ImageSource.gallery,
     );
 
@@ -137,16 +241,25 @@ class _MyAppState extends State<MyApp> {
       return;
     }
 
+    if (!mounted) return;
+
     setState(() {
-      selectedFile = File(pickedFile.path);
-      status = 'Video selected: ${pickedFile.name}';
+      selectedFile =
+          File(pickedFile.path);
+
+      status =
+          'Video selected: ${pickedFile.name}';
     });
   }
+
+
+  // SEND FILE
 
   Future<void> sendSelectedFile() async {
     if (selectedFile == null) {
       setState(() {
-        status = 'Please select a file first';
+        status =
+            'Please select a file first';
       });
 
       return;
@@ -154,7 +267,8 @@ class _MyAppState extends State<MyApp> {
 
     if (!isConnected) {
       setState(() {
-        status = 'Not connected to a peer yet';
+        status =
+            'Not connected to a peer yet';
       });
 
       return;
@@ -162,52 +276,101 @@ class _MyAppState extends State<MyApp> {
 
     setState(() {
       isSending = true;
+
       progress = 0.0;
-      status = 'Sending file...';
+
+      status =
+          'Sending file...';
     });
 
     try {
-      // IMPORTANT:
-      // We will create this method in transfer_client.dart
       await transferClient.sendFile(
         selectedFile!,
         onProgress: (sent, total) {
+          if (!mounted) return;
+
           setState(() {
-            progress = sent / total;
+            progress =
+                sent / total;
           });
         },
       );
 
-      setState(() {
-        progress = 1.0;
-        status = 'File sent successfully!';
-      });
-    } catch (e) {
-      print('Send error: $e');
+      if (!mounted) return;
 
       setState(() {
-        status = 'Failed to send file';
+        progress = 1.0;
+
+        status =
+            'File sent successfully!';
+      });
+    } catch (e) {
+      print(
+        'Send error: $e',
+      );
+
+      if (!mounted) return;
+
+      setState(() {
+        status =
+            'Failed to send file';
       });
     } finally {
+      if (!mounted) return;
+
       setState(() {
         isSending = false;
       });
     }
   }
 
+
+  // CHECK IMAGE
+
+  bool isImageFile(File file) {
+    final extension =
+        file.path
+            .split('.')
+            .last
+            .toLowerCase();
+
+    return extension == 'jpg' ||
+        extension == 'jpeg' ||
+        extension == 'png' ||
+        extension == 'gif' ||
+        extension == 'webp' ||
+        extension == 'bmp';
+  }
+
+  
+  // BUILD
+  
   @override
   Widget build(BuildContext context) {
+    // Only show images in the image grid.
+    final imageFiles = receivedFiles
+        .where(isImageFile)
+        .toList();
+
     return MaterialApp(
       home: Scaffold(
         appBar: AppBar(
-          title: const Text('VConnect'),
+          title: const Text(
+            'VConnect',
+          ),
           centerTitle: true,
         ),
-        body: Padding(
-          padding: const EdgeInsets.all(20),
-          child: Center(
+
+
+        body: SafeArea(
+          child: SingleChildScrollView(
+            padding:
+                const EdgeInsets.all(20),
+
             child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
+              mainAxisAlignment:
+                  MainAxisAlignment.center,
+
               children: [
                 Icon(
                   isConnected
@@ -216,64 +379,209 @@ class _MyAppState extends State<MyApp> {
                   size: 70,
                 ),
 
-                const SizedBox(height: 20),
+                const SizedBox(
+                  height: 20,
+                ),
+
 
                 Text(
                   status,
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(fontSize: 18),
+                  textAlign:
+                      TextAlign.center,
+                  style:
+                      const TextStyle(
+                    fontSize: 18,
+                  ),
                 ),
 
-                const SizedBox(height: 30),
+                const SizedBox(
+                  height: 30,
+                ),
 
                 ElevatedButton.icon(
-                  onPressed: isSending ? null : pickImage,
-                  icon: const Icon(Icons.image),
-                  label: const Text('Pick Photo'),
+                  onPressed:
+                      isSending
+                          ? null
+                          : pickImage,
+
+                  icon:
+                      const Icon(
+                    Icons.image,
+                  ),
+
+                  label:
+                      const Text(
+                    'Pick Photo',
+                  ),
                 ),
 
-                const SizedBox(height: 10),
+                const SizedBox(
+                  height: 10,
+                ),
 
                 ElevatedButton.icon(
-                  onPressed: isSending ? null : pickVideo,
-                  icon: const Icon(Icons.video_library),
-                  label: const Text('Pick Video'),
+                  onPressed:
+                      isSending
+                          ? null
+                          : pickVideo,
+
+                  icon:
+                      const Icon(
+                    Icons.video_library,
+                  ),
+
+                  label:
+                      const Text(
+                    'Pick Video',
+                  ),
                 ),
 
-                const SizedBox(height: 20),
+                const SizedBox(
+                  height: 20,
+                ),
+
 
                 if (selectedFile != null)
                   Text(
-                    'Selected: ${selectedFile!.path.split('/').last}',
-                    textAlign: TextAlign.center,
+                    'Selected: '
+                    '${selectedFile!.path.split('/').last}',
+                    textAlign:
+                        TextAlign.center,
                   ),
 
-                const SizedBox(height: 30),
+                const SizedBox(
+                  height: 30,
+                ),
+
 
                 if (isSending) ...[
                   LinearProgressIndicator(
                     value: progress,
                   ),
 
-                  const SizedBox(height: 10),
+                  const SizedBox(
+                    height: 10,
+                  ),
 
                   Text(
                     '${(progress * 100).toStringAsFixed(1)}%',
-                    style: const TextStyle(fontSize: 16),
+                    style:
+                        const TextStyle(
+                      fontSize: 16,
+                    ),
                   ),
 
-                  const SizedBox(height: 20),
+                  const SizedBox(
+                    height: 20,
+                  ),
                 ],
 
+
                 ElevatedButton.icon(
-                  onPressed: selectedFile == null ||
-                          !isConnected ||
-                          isSending
-                      ? null
-                      : sendSelectedFile,
-                  icon: const Icon(Icons.send),
-                  label: const Text('Send'),
+                  onPressed:
+                      selectedFile == null ||
+                              !isConnected ||
+                              isSending
+                          ? null
+                          : sendSelectedFile,
+
+                  icon:
+                      const Icon(
+                    Icons.send,
+                  ),
+
+                  label:
+                      const Text(
+                    'Send',
+                  ),
                 ),
+
+                const SizedBox(
+                  height: 30,
+                ),
+
+                if (imageFiles.isNotEmpty) ...[
+                  const Align(
+                    alignment:
+                        Alignment.centerLeft,
+
+                    child: Text(
+                      'Received Files',
+
+                      style:
+                          TextStyle(
+                        fontSize: 20,
+                        fontWeight:
+                            FontWeight.bold,
+                      ),
+                    ),
+                  ),
+
+                  const SizedBox(
+                    height: 15,
+                  ),
+
+                  GridView.builder(
+                    shrinkWrap: true,
+
+                    physics:
+                        const NeverScrollableScrollPhysics(),
+
+                    gridDelegate:
+                        const SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: 2,
+
+                      crossAxisSpacing:
+                          10,
+
+                      mainAxisSpacing:
+                          10,
+
+                      childAspectRatio:
+                          1,
+                    ),
+
+                    itemCount:
+                        imageFiles.length,
+
+                    itemBuilder:
+                        (context, index) {
+                      final file =
+                          imageFiles[index];
+
+                      return ClipRRect(
+                        borderRadius:
+                            BorderRadius.circular(
+                          10,
+                        ),
+
+                        child:
+                            Image.file(
+                          file,
+
+                          fit:
+                              BoxFit.cover,
+
+                          errorBuilder:
+                              (
+                            context,
+                            error,
+                            stackTrace,
+                          ) {
+                            return const Center(
+                              child:
+                                  Icon(
+                                Icons
+                                    .broken_image,
+                                size: 40,
+                              ),
+                            );
+                          },
+                        ),
+                      );
+                    },
+                  ),
+                ],
               ],
             ),
           ),
