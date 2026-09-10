@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:media_transfer/core/device_identity.dart';
 
 import 'features/discovery/discovery_service.dart';
 import 'features/transfer/transfer_server.dart';
@@ -49,6 +50,7 @@ class _MyAppState extends State<MyApp> {
     super.initState();
 
     transferServer = TransferServer(
+
       onFileReceived: (filePath) async {
         print(
           'File received by UI: $filePath',
@@ -63,13 +65,62 @@ class _MyAppState extends State<MyApp> {
               'File received successfully!';
         });
       },
+
+      // ------------------------------------------------------------
+      // CONNECTION REQUEST CALLBACK
+      // ------------------------------------------------------------
+      onConnectionRequest: (deviceName) async {
+        if (!mounted) {
+          return false;
+        }
+
+        final result = await showDialog<bool>(
+          context: context,
+          barrierDismissible: false,
+          builder: (context) {
+            return AlertDialog(
+              title: const Text(
+                'Connection Request',
+              ),
+
+              content: Text(
+                '$deviceName wants to connect to your device.',
+              ),
+
+              actions: [
+                TextButton(
+                  onPressed: () {
+                    Navigator.of(context).pop(false);
+                  },
+                  child: const Text(
+                    'Reject',
+                  ),
+                ),
+
+                ElevatedButton(
+                  onPressed: () {
+                    Navigator.of(context).pop(true);
+                  },
+                  child: const Text(
+                    'Accept',
+                  ),
+                ),
+              ],
+            );
+          },
+        );
+
+        return result ?? false;
+      },
     );
 
     startApp();
   }
 
-
+  // ------------------------------------------------------------
   // LOAD RECEIVED FILES
+  // ------------------------------------------------------------
+
   Future<void> loadReceivedFiles() async {
     final files =
         await transferServer.getReceivedFiles();
@@ -81,8 +132,9 @@ class _MyAppState extends State<MyApp> {
     });
   }
 
-
+  // ------------------------------------------------------------
   // START APP
+  // ------------------------------------------------------------
 
   Future<void> startApp() async {
     final granted =
@@ -172,23 +224,54 @@ class _MyAppState extends State<MyApp> {
         });
 
         try {
-          await transferClient.connect(
+          // --------------------------------------------------------
+          // CONNECT + HANDSHAKE
+          // --------------------------------------------------------
+          final myName = await DeviceIdentity.getDeviceName();
+          final bool connected =
+              await transferClient.connect(
             address,
             peer.port ?? 4040,
+
+            // Device name sent to the other device.
+            myName,
           );
 
           if (!mounted) return;
 
-          setState(() {
-            isConnected = true;
+          // --------------------------------------------------------
+          // CONNECTION ACCEPTED
+          // --------------------------------------------------------
 
-            status =
-                'Connected! Select a photo or video.';
-          });
+          if (connected) {
+            setState(() {
+              isConnected = true;
 
-          print(
-            'Connected to peer',
-          );
+              status =
+                  'Connected! Select a photo or video.';
+            });
+
+            print(
+              'Connection accepted by peer',
+            );
+          }
+
+          // --------------------------------------------------------
+          // CONNECTION REJECTED
+          // --------------------------------------------------------
+
+          else {
+            setState(() {
+              isConnected = false;
+
+              status =
+                  'Connection rejected by peer';
+            });
+
+            print(
+              'Connection rejected by peer',
+            );
+          }
         } catch (e) {
           print(
             'Connection error: $e',
@@ -197,6 +280,8 @@ class _MyAppState extends State<MyApp> {
           if (!mounted) return;
 
           setState(() {
+            isConnected = false;
+
             status =
                 'Connection failed';
           });
@@ -208,6 +293,7 @@ class _MyAppState extends State<MyApp> {
   // ------------------------------------------------------------
   // PICK IMAGE
   // ------------------------------------------------------------
+
   Future<void> pickImage() async {
     final XFile? pickedFile =
         await picker.pickImage(
@@ -229,8 +315,10 @@ class _MyAppState extends State<MyApp> {
     });
   }
 
-
+  // ------------------------------------------------------------
   // PICK VIDEO
+  // ------------------------------------------------------------
+
   Future<void> pickVideo() async {
     final XFile? pickedFile =
         await picker.pickVideo(
@@ -252,8 +340,9 @@ class _MyAppState extends State<MyApp> {
     });
   }
 
-
+  // ------------------------------------------------------------
   // SEND FILE
+  // ------------------------------------------------------------
 
   Future<void> sendSelectedFile() async {
     if (selectedFile == null) {
@@ -324,8 +413,9 @@ class _MyAppState extends State<MyApp> {
     }
   }
 
-
+  // ------------------------------------------------------------
   // CHECK IMAGE
+  // ------------------------------------------------------------
 
   bool isImageFile(File file) {
     final extension =
@@ -342,9 +432,10 @@ class _MyAppState extends State<MyApp> {
         extension == 'bmp';
   }
 
-  
+  // ------------------------------------------------------------
   // BUILD
-  
+  // ------------------------------------------------------------
+
   @override
   Widget build(BuildContext context) {
     // Only show images in the image grid.
@@ -360,7 +451,6 @@ class _MyAppState extends State<MyApp> {
           ),
           centerTitle: true,
         ),
-
 
         body: SafeArea(
           child: SingleChildScrollView(
@@ -383,7 +473,6 @@ class _MyAppState extends State<MyApp> {
                   height: 20,
                 ),
 
-
                 Text(
                   status,
                   textAlign:
@@ -403,12 +492,10 @@ class _MyAppState extends State<MyApp> {
                       isSending
                           ? null
                           : pickImage,
-
                   icon:
                       const Icon(
                     Icons.image,
                   ),
-
                   label:
                       const Text(
                     'Pick Photo',
@@ -424,12 +511,10 @@ class _MyAppState extends State<MyApp> {
                       isSending
                           ? null
                           : pickVideo,
-
                   icon:
                       const Icon(
                     Icons.video_library,
                   ),
-
                   label:
                       const Text(
                     'Pick Video',
@@ -439,7 +524,6 @@ class _MyAppState extends State<MyApp> {
                 const SizedBox(
                   height: 20,
                 ),
-
 
                 if (selectedFile != null)
                   Text(
@@ -452,7 +536,6 @@ class _MyAppState extends State<MyApp> {
                 const SizedBox(
                   height: 30,
                 ),
-
 
                 if (isSending) ...[
                   LinearProgressIndicator(
@@ -476,7 +559,6 @@ class _MyAppState extends State<MyApp> {
                   ),
                 ],
 
-
                 ElevatedButton.icon(
                   onPressed:
                       selectedFile == null ||
@@ -484,12 +566,10 @@ class _MyAppState extends State<MyApp> {
                               isSending
                           ? null
                           : sendSelectedFile,
-
                   icon:
                       const Icon(
                     Icons.send,
                   ),
-
                   label:
                       const Text(
                     'Send',
@@ -504,10 +584,8 @@ class _MyAppState extends State<MyApp> {
                   const Align(
                     alignment:
                         Alignment.centerLeft,
-
                     child: Text(
                       'Received Files',
-
                       style:
                           TextStyle(
                         fontSize: 20,
@@ -530,13 +608,10 @@ class _MyAppState extends State<MyApp> {
                     gridDelegate:
                         const SliverGridDelegateWithFixedCrossAxisCount(
                       crossAxisCount: 2,
-
                       crossAxisSpacing:
                           10,
-
                       mainAxisSpacing:
                           10,
-
                       childAspectRatio:
                           1,
                     ),
@@ -558,10 +633,8 @@ class _MyAppState extends State<MyApp> {
                         child:
                             Image.file(
                           file,
-
                           fit:
                               BoxFit.cover,
-
                           errorBuilder:
                               (
                             context,
